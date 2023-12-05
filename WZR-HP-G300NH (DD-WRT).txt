@@ -1,0 +1,206 @@
+A. HƯỚNG DẪN CÀI ĐẶT - UNBRICK MODEM BUFFALO WZR-HP-G300NH (PHIÊN BẢN NHẬT) A0 A2 Model
+
+I. NÂNG CẤP FIRMWARE DD-WRT: (LUU Y : CHI DANH CHO PHIEN BAN QUOC TE)
+	Nếu Router đang dùng Firmware DD-WRT chỉ cần vao dia chỉ để tải bản nâng cấp
+	http://download1.dd-wrt.com/dd-wrtv2/downloads/betas/2020/	//MỚI NHẤT
+	https://digi9.net/221/openwrt-fix-loi-firmware-router-buffalo-wzr-hp-g450h/
+	Nhớ chọn bản wzr-hp-g300nh-dd-wrt-webupgrade-MULTI.bin
+	Khi nâng cấp xong, reboot lại modem.
+	
+II. UNBRICK:
+
+	1. Đưa Router vền FIRMWARE GỐC:
+	
+	Kết nối Router vào máy tính dùng giao thức TTL/Serial rồi dùng trình tftp để cài đặt, Ở đây sử dung trình Tera Term VT. (teraterm-4.105.zip) Chinh Windows Firewall cho phep tterm out.
+	Tham khao: https://scarygliders.net/2010/02/23/hacking-around-the-japanese-buffalo-wzr-hp-g300n/
+	
+	LƯU Ý: Nếu Tterm Terminal chỉ hiện chữ Nhật do firmware lỗi, cần đưa Router về Hard Reset hoặc 30/30/30 Reset (http://g300nh.blogspot.com/2010/06/firmware-flash-and-brick-recovery.html | https://wiki.dd-wrt.com/wiki/index.php/Hard_reset_or_30/30/30 )
+	
+	Trước hết phải đưa Router về Firmware gốc, -> Buffalo_Stock_179.bin (có trong Google Drive - daiphucnt)
+	LƯU Ý: Bản 165 up lên được nhưng không up lên tiếp DD-WRT được. Hai bản này đều có Magic number ở đầu file (sử dụng Hex Editor kiểm tra). Nên nhớ chỉ up firmware bằng tftp có Magic Number, nếu không thì tiến trình đưa Router về Firmware gốc sẽ bị lỗi.
+	
+	Chạy tftp serial port setup: Port: COM 4, Speed: 115200 >OK
+	nhập lệnh: printenv xem thông số MODEM
+	nhập lệnh: setenv region JP > saveenv (đổi vùng cho router, không quan trong, cứ để vùng là JP cũng được) >>LUU Y: Phai de vung la JP up Firmware len moi duoc, khong se bao loi.
+	
+	Copy Firmware Buffalo_Stock_179.bin vào bộ nhớ tạm:
+	ar7100> loady -> Chọn File>Transfer>YMODEM>Send (chọn file Buffalo_Stock_179.bin)
+	Firmware sẽ copy vào vị trí 81f00000, phai chac chan up len toi 100%. Khi up lên xong NHỚ để ý dung lượng Byte đã upload dạng HEX
+	
+	LƯU Ý: Kiểm tra file tải lên:
+	ar7100> iminfo
+		
+	Xóa fimware cũ:
+	ar7100> erase BE060000 BFFDFFFF	//PHÂN VÙNG FIRMWARE CHÍNH
+	Khi  xong, Copy Firmware mới từ bộ nhớ tạm qua:
+	ar7100> cp.b 81f00000 be060000 0149f000 (LƯU Ý: ở đây, 0149f000 (Hex) tương ứng 21622784 bytes, chỉ là ví dụ, nhớ thay đổi dung lượng firmware mới dạng Hex ở bộ nhớ tạm vừa up lên)
+	ar7100> bootm BE060000 //để chạy Firmware mới.
+	
+	2. Nâng cấp tiếp lên DD-WRT:
+	Vào Web: http://download1.dd-wrt.com/dd-wrtv2/downloads/betas/2020/ tải bản mới nhất/ hoặc ổn định nhất, chỉ tải bản buffalo_to_ddwrt_webflash-MULTI.bin -> tiến hành quá trình nâng cấp bình thường qua trang Web.
+	Xong
+	
+	LƯU Ý: Khi đã dùng bản DD-WRT, muốn nâng cấp tiếp DD-WRT mới, Router sẽ bị brick, hien chua co cach khac phuc :(
+	
+	3. Cài đặt sử dụng Router:
+	Đặt username/password cho Router, sau đó vào Status>Wireless>SiteSurvey chọn mạng. Chỉnh Wireless > Basic Setting > Wireless Mode là Client, Wireless Security > WPA2 theo mạng ở nhà > Nhấn Save.
+	Chuyển qua tap Setup>Basic Setup, chon connection type là Auto Confi, Router IP > 
+	Local IP Address là: 192.168.2.1
+	Subnet Mask 255.255.255.0
+	Gateway: 192.168.2.1
+	Local DNS: 8.8.8.8	//Google DNS
+	Chọn Time Settings NTP Client Enable, Time Zone : asia/Ho_Chi_Minh, Server IP/Name: để trống.
+	Nhấn Save.
+	
+	Chuyển qua tap Security>Firewall, chọn SPI Firewall là Disable, xong nhấn Apply Settings.
+	LƯU Ý: File Backup cấu hinh lưu trong folder r.... daiphucnt, tải về và restore cho nhanh.
+	
+B. CAI DAT ENTWARE
+
+I. Chuan bi O dia:
+	External HDD, dung trinh HDD Partition (AOMI Partition)để tạo 2 phân vùng trên ổ đĩa, DATA và SYSTEM theo định dạng NTFS và EXT2, Phan vung DATA (sda5) NTFS dùng để chứa dữ liệu, phan vung SYSTEM (sda6) EXT2 dùng để cài đặt Entware và các tập tin liên quan, chỉ cần 200MB>1000MB là đủ.
+	
+	Cắm HDD vào Router, de DD-WRT Service > USB nhận diện 2 phân vùng, chọn Mount this Partition to /opt là /tmp/mnt/sda6 (SYSTEM). Sau đó chạy trình ssh vào Router.
+	
+	Nhập lệnh:
+	#mount -o bind /tmp/mnt/sda6/opt /opt		//sda6 la phan vung SYSTEM
+	#cd /opt
+	#wget http://bin.entware.net/mipssf-k3.4/installer/generic.sh		//Atheros MIPS
+	#sh generic.sh
+	
+	Khi da cai dat xong nhap tiep:
+	#opkg update
+	#opkg upgrade
+	
+	The Final Step is to add the following commands to the start-up script (Administration tab - then Commands). The sleep value can be adjusted, but 10 is long enough for most USB Harddrives/routers:
+	
+	mount -o bind /tmp/mnt/sda6/opt /opt
+	sleep 10
+	/opt/etc/init.d/rc.unslung start
+	
+	THAM KHAO: https://wiki.dd-wrt.com/wiki/index.php/Installing_Entware
+	
+II. Cài đặt ps3netsrv:
+	#opkg list ps3*		//tim package ps3netsrv
+	#opkg install ps3netsrv
+	#opkg install nano
+	#opkg install htop
+
+	Chạy ps3netsrv:
+	#ps3netsrv /tmp/mnt/sda5/GAMEZ 38008		//sda5 (DATA)là phân vùng chứa dữ liệu, PS3/PS3ISO là thư mục mặc định chứa ps3 game iso, 38008 là port mặc định.
+	
+	Cấu trúc HDD chứa Game:
+	GAMEZ
+		|_PS3ISO
+		|_PS2ISO
+		|_PSXISO
+		|_PSPISO
+		|_ROMS
+		|_GAMES		//PS3 Game Folder
+	
+	
+III. Cai dat Lighttpd va Aria2:
+	
+	Không dùng chức năng mặc định Lighttpd trong DD-WRT.
+	Cài đặt lighttpd qua Entware:
+	
+	#opkg install lighttpd lighttpd-mod-fastcgi 7-cgi
+	
+	Chỉnh sửa file:
+	#nano /opt/etc/lighttpd/lighttpd.conf
+		server.port=81
+		server.upload.dirs=("opt/tmp")
+	
+	Tạo file test:
+	#nano /opt/share/www/index.html
+	Nhập:
+		<html>
+		<head>
+		<title>lighttpd default page</title>
+		</head>
+		<body>
+		<h2>lighttpd server is running.</h2>
+		</body>
+		</html>
+	
+	#chmod 744 /opt/share/www
+	
+	Khởi động Lighttpd:
+	#/opt/etc/init.d/S80lighttpd start
+	Mở Chrome, nhập 192.168.2.1:81, nếu có dòng lighttpd server is running. là OK.
+	
+	Tham khảo: https://github.com/RMerl/asuswrt-merlin.ng/wiki/Lighttpd-web-server-with-PHP-support-through-Entware
+	
+	#opkg install aria2
+	
+	Backup file config của aria:
+	#mv /opt/etc/aria2.conf /opt/etc/aria2.conf.backup
+	
+	Tạo file aria.conf mới:
+	#nano /opt/etc/aria2.conf
+	
+	Nhập nội dung:
+	
+---------------------------
+daemon=true
+# METALINKS settings #
+dir=/tmp/mnt/sda5/Downloads
+file-allocation=falloc
+#user&pass dang nhap tren Web de tai file ve
+#http-user=USER_NAME
+#http-passwd=PASSWORD
+continue
+max-connection-per-server=6
+max-concurrent-downloads=3
+#save-session=/mnt/disk1/www/aria.txt
+input-file=/tmp/mnt/sda5/Downloads/aria2.txt
+disk-cache=25M
+timeout=600
+retry-wait=30
+max-tries=50
+
+# RPC settings #
+disable-ipv6=true
+enable-rpc=true
+#rpc-user=admin
+#rpc-passwd=password
+rpc-listen-port=6800
+rpc-listen-all=true
+rpc-port-all=true
+http-auth-challenge=true	//set=true for using HTTPS you should install the CA bundle
+ca-certificate=/opt/etc/ssl/certs/cert.pem	//tao va copy file Equifax_Secure_Global_eBusiness_CA-1.cer, doi ten .cer thanh .pem
+check-certificate=false
+log=/tmp/mnt/sda5/Downloads/aria2.log
+log-level=warn
+auto-save-interval=60
+event-poll=select
+
+# TORRENT settings #
+enable-dht=false
+dht-listen-port=6801
+# seed ratio and seed time in minutes
+seed-ratio=1.0
+seed-time=1460
+max-upload-limit=20K
+---------------------------
+	Chạy thử aria:
+	#/opt/etc/init.d/S81aria2
+	
+	Cài đặt aria web UI:
+	#cd /opt/tmp
+	#wget https://github.com/ziahamza/webui-aria2.git
+	#mkdir -p /opt/share/www/aria2		//thư mục chứa nội dung web
+	#unzip webui-aria2-master.zip -d /opt/share/www/aria2
+	
+	Dùng WinSCP login vào SYSTEM /opt/share/www/aria2 copy nội dung thư mục docs ra ngoài /aria2, còn lại xóa hết.
+	
+	#reboot
+	
+	ssh vao Router chạy 
+	#/opt/etc/init.d/S81aria2 start
+	
+	Vào trình duyệt
+	http://192.168.2.1:81/aria2
+	
+	TADA.............
+	
